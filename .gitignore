@@ -1,3 +1,6 @@
 .ionide/
 .vscode/
 .fake
+**/bin/
+**/obj/
+**/BenchmarkDotNet.Artifacts/
