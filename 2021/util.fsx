@@ -12,6 +12,9 @@ let loadLines fn =
     |> Seq.map fn
     |> List.ofSeq
 
+let loadWithChars () =
+    inputStr.AsSpan()
+
 let loadWithBinary () = 
     ReadOnlySpan(inputBytes)
 
