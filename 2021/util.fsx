@@ -12,10 +12,18 @@ let loadLines fn =
     |> Seq.map fn
     |> List.ofSeq
 
+#if !INTERACTIVE
+let loadWithChars inputStr =
+#else
 let loadWithChars () =
+#endif
     inputStr.AsSpan()
 
+#if !INTERACTIVE
+let loadWithBinary inputBytes = 
+#else
 let loadWithBinary () = 
+#endif
     ReadOnlySpan(inputBytes)
 
 let output title obj =
@@ -41,3 +49,16 @@ module Option =
         f a >>= g
     let inline (<=<) (f: 'b -> 'c option) (g: 'a -> 'b option) =
         g >=> f
+
+type ReadOnlySpan<'T> with
+    member sp.GetSlice(startIdx, endIdx) =
+        let s = defaultArg startIdx 0
+        let e = defaultArg endIdx sp.Length
+        sp.Slice(s, e - s)
+
+module Array =
+    let inline reduceInline ([<InlineIfLambda>]f: 'a -> 'a -> 'a) (arr: 'a[]) =
+        let mutable res = arr.[0]
+        for i = 1 to arr.Length-1 do
+            res <- f res arr.[i]
+        res
