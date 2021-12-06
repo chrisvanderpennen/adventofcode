@@ -60,7 +60,7 @@ type Answer () =
             i <- i + int f
         i
 
-    [<Benchmark>]
+//    [<Benchmark>]
     member public _.partOneSlow () =
         let bytes = loadWithBinary inputBytes
         let mutable fish = Array.zeroCreate<int> 9
@@ -81,13 +81,13 @@ type Answer () =
     [<Benchmark>]
     member public _.partOne () =
         let bytes = loadWithBinary inputBytes
-        let fish = (Array.zeroCreate<int> (512/16)).AsSpan()
+        let fish = (Array.zeroCreate<int> 16).AsSpan()
         
         for b = 0 to (bytes.Length / 2) do
             let idx = int(bytes[b <<< 1] &&& mask)
             fish[idx] <- fish[idx] + 1
 
-        let mutable fishVectors = MemoryMarshal.Cast<int, Vector256<int>>(fish)
+        let fishVectors = MemoryMarshal.Cast<int, Vector256<int>>(fish)
         let shuffleVector = Vector256.Create(1, 2, 3, 4, 5, 6, 7, 0)
 
         let mutable overflow = 0
@@ -100,14 +100,62 @@ type Answer () =
         let sum128 = Avx2.Add(fishVectors[0].GetLower(), fishVectors[0].GetUpper())
         (hsum_epi32_avx sum128) + overflow
 
+
+//    [<Benchmark>]
+    member public _.partTwoSlow () =
+        let bytes = loadWithBinary inputBytes
+        let mutable fish = Array.zeroCreate<uint64> 9
+        
+        for b = 0 to (bytes.Length / 2) do
+            let idx = int(bytes[b <<< 1] &&& mask)
+            fish[idx] <- fish[idx] + 1uL
+        
+        for _ = 0 to 255 do
+            fish <- Array.permute (fun i -> (i - 1 + fish.Length) % fish.Length) fish
+            fish[6] <- fish[6] + fish[8]
+        
+        let mutable i = 0uL
+        for f in fish do
+            i <- i + f
+        i
+
+    [<Benchmark>]
+    member public _.partTwo () =
+        let bytes = loadWithBinary inputBytes
+        let fish = (Array.zeroCreate<uint64> 12).AsSpan()
+        let fishMiddle = fish.Slice(3)
+        let fishRight = fish.Slice(6)
+        
+        for b = 0 to (bytes.Length / 2) do
+            let idx = int(bytes[b <<< 1] &&& mask)
+            fish[idx] <- fish[idx] + 1uL
+
+        let fishVectorLeft = MemoryMarshal.Cast<uint64, Vector256<uint64>>(fish)
+        let fishVectorMiddle = MemoryMarshal.Cast<uint64, Vector256<uint64>>(fishMiddle)
+        let fishVectorRight = MemoryMarshal.Cast<uint64, Vector256<uint64>>(fishRight)
+
+        for i = 0 to 255 do
+            let temp = fish[0]
+            fishVectorLeft[0] <- Avx2.Permute4x64(fishVectorLeft[0], 0b00111001uy)
+            fishVectorMiddle[0] <- Avx2.Permute4x64(fishVectorMiddle[0], 0b00111001uy)
+            fishVectorRight[0] <- Avx2.Permute4x64(fishVectorRight[0], 0b11001001uy)
+            fish[6] <- fish[6] + temp
+        
+        let mutable i = 0uL
+        for idx = 0 to 8 do
+            i <- i + fish[idx]
+        i
+
+
 let answer = Answer ()
 #if !INTERACTIVE
 answer.setup ()
 #endif
 //answer.wat ()
-printfn "%A" ((answer.partOneSlow ()))
-printfn "%A" ((answer.partOne ()))
-//printfn "%A" answer.partTwo ()
+// printfn "%A" ((answer.partOneSlow ()))
+// printfn "%A" ((answer.partOne ()))
+//printfn "%A" (answer.partTwoSlow ())
+//printfn "%A" (answer.partTwo ())
 
 BenchmarkRunner.Run<Answer>() |> ignore
 
