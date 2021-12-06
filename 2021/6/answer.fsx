@@ -10,6 +10,7 @@ open BenchmarkDotNet.Running
 open System.Runtime.Intrinsics
 open System.Runtime.Intrinsics.X86
 open System.Runtime.InteropServices
+open Microsoft.FSharp.NativeInterop
 
 let inline hsum_epi32_avx (v: Vector128<int>) =
     let sum64 = Avx2.Add(Avx2.UnpackHigh(v.AsInt64(), v.AsInt64()).AsInt32(), v)
@@ -29,36 +30,6 @@ type Answer () =
     member public this.setup () =
         inputBytes <- File.ReadAllBytes "input.txt"
 #endif
-
-    member public _.wat () =
-        let bytes = loadWithBinary inputBytes
-        let mutable fishSlow = Array.zeroCreate<int> 9
-        let fish = (Array.zeroCreate<int> (512/16)).AsSpan()
-        
-        for b = 0 to (bytes.Length / 2) do
-            let idx = int(bytes[b <<< 1] &&& mask)
-            fishSlow[idx] <- fishSlow[idx] + 1
-            fish[idx] <- fish[idx] + 1
-
-        let mutable fishVectors = MemoryMarshal.Cast<int, Vector256<int>>(fish)
-        let shuffleVector = Vector256.Create(1, 2, 3, 4, 5, 6, 7, 0)
-
-        let mutable overflow = 0
-        for _ = 0 to 79 do
-            let temp = fishVectors[0].GetElement 0
-            fishVectors[1] <- Avx2.PermuteVar8x32(fishVectors.[0], shuffleVector).WithElement(7, overflow)
-            fishVectors[0] <- Avx2.Add (Vector256.Create(0, 0, 0, 0, 0, 0, temp, 0), fishVectors[1])
-            overflow <- temp
-
-            fishSlow <- Array.permute (fun i -> (i - 1 + fishSlow.Length) % fishSlow.Length) fishSlow
-            fishSlow[6] <- fishSlow[6] + fishSlow[8]
-            printfn "%A" fishSlow
-            printfn "%A %A" fishVectors[0] overflow
-        
-        let mutable i = 0
-        for f in fishSlow do
-            i <- i + int f
-        i
 
 //    [<Benchmark>]
     member public _.partOneSlow () =
@@ -146,17 +117,11 @@ type Answer () =
             i <- i + fish[idx]
         i
 
-
 let answer = Answer ()
 #if !INTERACTIVE
 answer.setup ()
 #endif
-//answer.wat ()
-// printfn "%A" ((answer.partOneSlow ()))
-// printfn "%A" ((answer.partOne ()))
-//printfn "%A" (answer.partTwoSlow ())
-//printfn "%A" (answer.partTwo ())
+printfn "%A" ((answer.partOne ()))
+printfn "%A" (answer.partTwo ())
 
 BenchmarkRunner.Run<Answer>() |> ignore
-
-//
