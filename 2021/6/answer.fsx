@@ -2,38 +2,25 @@
 #r "nuget:BenchmarkDotNet"
 #load "../util.fsx"
 #endif
+
 open System
-open System.IO
-open System.Numerics
-open BenchmarkDotNet.Attributes
-open BenchmarkDotNet.Running
 open System.Runtime.Intrinsics
 open System.Runtime.Intrinsics.X86
 open System.Runtime.InteropServices
-open Microsoft.FSharp.NativeInterop
+open BenchmarkDotNet.Attributes
 
 let inline hsum_epi32_avx (v: Vector128<int>) =
     let sum64 = Avx2.Add(Avx2.UnpackHigh(v.AsInt64(), v.AsInt64()).AsInt32(), v)
     let sum32 = Avx2.Add(sum64, Avx2.Shuffle(sum64, 0b10110001uy));
     sum32.ToScalar<int> ()
 
-[<SimpleJob>]
-[<MemoryDiagnoser>]
 type Answer () =
+    inherit BaseAnswer()
     let mask = 0b0000_1111uy
 
-#if INTERACTIVE
-    let inputBytes = ()
-#else
-    let mutable inputBytes = Array.empty<byte>
-    [<GlobalSetup>]
-    member public this.setup () =
-        inputBytes <- File.ReadAllBytes "input.txt"
-#endif
-
 //    [<Benchmark>]
-    member public _.partOneSlow () =
-        let bytes = loadWithBinary inputBytes
+    member public this.partOneSlow () =
+        let bytes = this.loadBinary ()
         let mutable fish = Array.zeroCreate<int> 9
         
         for b = 0 to (bytes.Length / 2) do
@@ -50,8 +37,8 @@ type Answer () =
         i
 
     [<Benchmark>]
-    member public _.partOne () =
-        let bytes = loadWithBinary inputBytes
+    member public this.partOne () =
+        let bytes = this.loadBinary ()
         let fish = (Array.zeroCreate<int> 16).AsSpan()
         
         for b = 0 to (bytes.Length / 2) do
@@ -73,8 +60,8 @@ type Answer () =
 
 
 //    [<Benchmark>]
-    member public _.partTwoSlow () =
-        let bytes = loadWithBinary inputBytes
+    member public this.partTwoSlow () =
+        let bytes = this.loadBinary ()
         let mutable fish = Array.zeroCreate<uint64> 9
         
         for b = 0 to (bytes.Length / 2) do
@@ -91,8 +78,8 @@ type Answer () =
         i
 
     [<Benchmark>]
-    member public _.partTwo () =
-        let bytes = loadWithBinary inputBytes
+    member public this.partTwo () =
+        let bytes = this.loadBinary ()
         let fish = (Array.zeroCreate<uint64> 12).AsSpan()
         let fishMiddle = fish.Slice(3)
         let fishRight = fish.Slice(6)
@@ -118,10 +105,11 @@ type Answer () =
         i
 
 let answer = Answer ()
-#if !INTERACTIVE
 answer.setup ()
-#endif
 printfn "%A" ((answer.partOne ()))
 printfn "%A" (answer.partTwo ())
 
+#if !INTERACTIVE
+open BenchmarkDotNet.Running
 BenchmarkRunner.Run<Answer>() |> ignore
+#endif

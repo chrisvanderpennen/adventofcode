@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
-    <RootNamespace>_6</RootNamespace>
+    <RootNamespace>advent</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

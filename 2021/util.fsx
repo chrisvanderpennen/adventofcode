@@ -1,37 +1,57 @@
 [<AutoOpen>]
 module Util
+#if INTERACTIVE
+#r "nuget:BenchmarkDotNet"
+#endif
 
-open System.IO
 open System
+open System.IO
+open System.Runtime.InteropServices
+open System.Runtime.Intrinsics
+open BenchmarkDotNet.Attributes
+open System.Buffers
 
-let inputStr = File.ReadAllText "input.txt"
-let inputBytes = File.ReadAllBytes "input.txt"
+[<SimpleJob>]
+[<MemoryDiagnoser>]
+[<DisassemblyDiagnoser(printSource = true)>]
+type BaseAnswer () =
 
-let loadLines fn = 
-    inputStr.Split '\n'
-    |> Seq.map fn
-    |> List.ofSeq
+#if INTERACTIVE
+    let inputStr = File.ReadAllText "input.txt"
+    let inputBytes = File.ReadAllBytes "input.txt"
 
-#if !INTERACTIVE
-let loadWithChars inputStr =
+    member public this.setup () =
+        ()
 #else
-let loadWithChars () =
-#endif
-    inputStr.AsSpan()
+    let mutable inputStr = ""
+    let mutable inputBytes = Array.empty
 
-#if !INTERACTIVE
-let loadWithBinary inputBytes = 
-#else
-let loadWithBinary () = 
+    [<GlobalSetup>]
+    member public this.setup () =
+        inputStr <- File.ReadAllText "input.txt"
+        inputBytes <- File.ReadAllBytes "input.txt"
 #endif
-    ReadOnlySpan(inputBytes)
+
+    member public _.loadChars () =
+        inputStr.AsSpan()
+
+    member public _.loadBinary () = 
+        Span(inputBytes)
+
+    member public _.loadReader () =
+        SequenceReader (ReadOnlySequence inputBytes)
 
 let output title obj =
     printfn "%s: %A" title obj
 
-let dump obj =
+let tee obj =
     printfn "%A" obj
     obj
+
+let loadLines f =
+    File.ReadLines "input.txt"
+    |> Seq.map f
+    |> List.ofSeq
 
 module Tuple2 =
     let inline map ([<InlineIfLambda>]f: 'a -> 'b) ([<InlineIfLambda>]g: 'c -> 'd) (a,b) = f a, g b
@@ -56,9 +76,31 @@ type ReadOnlySpan<'T> with
         let e = defaultArg endIdx sp.Length
         sp.Slice(s, e - s)
 
+let vectorise (span: Span<'t>) (tail: Span<'t> outref) =
+    let vectors = MemoryMarshal.Cast<'t, Vector256<'t>>(span)
+    tail <- span.Slice(vectors.Length * (sizeof<Vector256<'t>> / sizeof<'t>))
+    vectors
+
+let vectorise128 (span: Span<'t>) (tail: Span<'t> outref) =
+    let vectors = MemoryMarshal.Cast<'t, Vector128<'t>>(span)
+    tail <- span.Slice(vectors.Length * (sizeof<Vector128<'t>> / sizeof<'t>))
+    vectors
+
 module Array =
     let inline reduceInline ([<InlineIfLambda>]f: 'a -> 'a -> 'a) (arr: 'a[]) =
         let mutable res = arr.[0]
         for i = 1 to arr.Length-1 do
             res <- f res arr.[i]
+        res
+
+    let inline permuteInline ([<InlineIfLambda>]indexMap) (arr : _[]) =
+        let res = Array.zeroCreate arr.Length
+        let inv = Array.zeroCreate arr.Length
+        for i = 0 to arr.Length - 1 do
+            let j = indexMap i
+            if j < 0 || j >= arr.Length then invalidArg "indexMap" "not a permutation"
+            res.[j] <- arr.[i]
+            inv.[j] <- 1uy
+        for i = 0 to arr.Length - 1 do
+            if inv.[i] <> 1uy then invalidArg "indexMap" "not a permutation"
         res
