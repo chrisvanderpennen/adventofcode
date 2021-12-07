@@ -9,7 +9,7 @@ open BenchmarkDotNet.Attributes
 type Answer () =
     inherit BaseAnswer()
 
-    [<Benchmark>]
+    // [<Benchmark>]
     member public this.partOne_FirstAttempt () =
         let input = this.loadBinary ()
         let arr = Array.zeroCreate 1000
@@ -22,12 +22,12 @@ type Answer () =
             else
                 arr[i] <- arr[i] * 10 + int32(input[p] &&& 0x0fuy)
 
-        let arr2 = Array.sort arr
-        let median = arr2[arr.Length / 2]
-        let diff = Array.sumBy (fun i -> (median - i) |> abs) arr2
+        Array.sortInPlace arr
+        let median = arr[arr.Length / 2]
+        let diff = Array.sumBy (fun i -> (median - i) |> abs) arr
         diff
 
-    [<Benchmark>]
+    // [<Benchmark>]
     member public this.partOne () =
         let input = this.loadBinary ()
         let arr = Array.zeroCreate 1000
@@ -46,19 +46,16 @@ type Answer () =
 
         let inline riemannDistance a b = abs(b - a)
 
-        let rec frechetMedian struct(dMin, pMin) struct(dMax, pMax) =
+        let rec frechetMedian dMin pMin dMax pMax =
             match abs(pMax - pMin) with
             | 0
-            | 1 -> if dMin < dMax then pMin else pMax
+            | 1 -> if dMin < dMax then dMin, pMin else dMax, pMax
             | range ->
                 let p1 = (min pMin pMax) + (range / 2)
                 let d1 = Array.sumBy (riemannDistance p1) arr
-                let pivot = struct(d1, p1)
-                let wall = min struct(dMin, pMin) struct(dMax, pMax)
-                frechetMedian pivot wall
+                if dMin < dMax then frechetMedian dMin pMin d1 p1 else frechetMedian dMax pMax d1 p1
 
-        let fm = frechetMedian struct((Array.sumBy (riemannDistance minV) arr), minV) struct((Array.sumBy (riemannDistance maxV) arr), maxV)
-        let distance = Array.sumBy (riemannDistance fm) arr
+        let distance, fm = frechetMedian (Array.sumBy (riemannDistance minV) arr) minV (Array.sumBy (riemannDistance maxV) arr) maxV
         fm, distance
 
     [<Benchmark>]
@@ -82,20 +79,22 @@ type Answer () =
             let dst = abs(b - a)
             dst * (dst + 1) / 2
 
-        let rec frechetMedian struct(dMin, pMin) struct(dMax, pMax) =
+        let rec frechetMedian dMin pMin dMax pMax =
             match abs(pMax - pMin) with
             | 0
-            | 1 -> if dMin < dMax then pMin else pMax
+            | 1 -> 
+                if dMin < dMax then
+                    struct(dMin, pMin)
+                else 
+                    struct(dMax, pMax)
             | range ->
                 let p1 = (min pMin pMax) + (range / 2)
                 let d1 = Array.sumBy (riemannDistance p1) arr
-                let pivot = struct(d1, p1)
-                let wall = min struct(dMin, pMin) struct(dMax, pMax)
-                frechetMedian pivot wall
+                if dMin < dMax then frechetMedian dMin pMin d1 p1 else frechetMedian dMax pMax d1 p1
 
-        let fm = frechetMedian struct((Array.sumBy (riemannDistance minV) arr), minV) struct((Array.sumBy (riemannDistance maxV) arr), maxV)
-        let distance = Array.sumBy (riemannDistance fm) arr
+        let struct(distance, fm) = frechetMedian (Array.sumBy (riemannDistance minV) arr) minV (Array.sumBy (riemannDistance maxV) arr) maxV
         fm, distance
+
 
 let answer = Answer ()
 answer.setup ()
