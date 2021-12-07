@@ -78,12 +78,12 @@ type ReadOnlySpan<'T> with
 
 let vectorise (span: Span<'t>) (tail: Span<'t> outref) =
     let vectors = MemoryMarshal.Cast<'t, Vector256<'t>>(span)
-    tail <- span.Slice(vectors.Length * (sizeof<Vector256<'t>> / sizeof<'t>))
+    tail <- span.Slice(vectors.Length * sizeof<'t> * Vector256<'t>.Count)
     vectors
 
 let vectorise128 (span: Span<'t>) (tail: Span<'t> outref) =
     let vectors = MemoryMarshal.Cast<'t, Vector128<'t>>(span)
-    tail <- span.Slice(vectors.Length * (sizeof<Vector128<'t>> / sizeof<'t>))
+    tail <- span.Slice(vectors.Length * sizeof<'t> * Vector128<'t>.Count)
     vectors
 
 module Array =
