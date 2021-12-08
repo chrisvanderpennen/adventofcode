@@ -13,7 +13,7 @@ open System.Buffers
 
 [<SimpleJob>]
 [<MemoryDiagnoser>]
-[<DisassemblyDiagnoser(printSource = true)>]
+// [<DisassemblyDiagnoser(printSource = true)>]
 type BaseAnswer () =
 
 #if INTERACTIVE
@@ -34,6 +34,17 @@ type BaseAnswer () =
 
     member public _.loadChars () =
         inputStr.AsSpan()
+    
+    member public _.loadLinesList () =
+        let lines = ResizeArray ()
+        let mutable enumerator = inputStr.AsSpan().EnumerateLines()
+        while enumerator.MoveNext() do
+            lines.Add (String(enumerator.Current))
+
+        let mutable list = []
+        for i = lines.Count - 1 downto 0 do
+            list <- lines[i]::list
+        list
 
     member public _.loadBinary () = 
         Span(inputBytes)
@@ -78,7 +89,9 @@ type ReadOnlySpan<'T> with
 
 let vectorise (span: Span<'t>) (tail: Span<'t> outref) =
     let vectors = MemoryMarshal.Cast<'t, Vector256<'t>>(span)
-    tail <- span.Slice(vectors.Length * sizeof<'t> * Vector256<'t>.Count)
+    let vSz = vectors.Length * sizeof<'t> * Vector256<'t>.Count
+    if vSz < span.Length then
+        tail <- span.Slice(vectors.Length * sizeof<'t> * Vector256<'t>.Count)
     vectors
 
 let vectorise128 (span: Span<'t>) (tail: Span<'t> outref) =
