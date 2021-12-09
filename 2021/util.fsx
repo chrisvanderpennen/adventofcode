@@ -8,6 +8,7 @@ open System
 open System.IO
 open System.Runtime.InteropServices
 open System.Runtime.Intrinsics
+open FSharp.NativeInterop
 open BenchmarkDotNet.Attributes
 open System.Buffers
 
@@ -68,8 +69,19 @@ module Tuple2 =
     let inline map ([<InlineIfLambda>]f: 'a -> 'b) ([<InlineIfLambda>]g: 'c -> 'd) (a,b) = f a, g b
     let inline mapFst ([<InlineIfLambda>]f) (a, b) = f a, b
     let inline mapSnd ([<InlineIfLambda>]f) (a, b) = a, f b
+    let inline liftFst ([<InlineIfLambda>]f: 'a -> 'b) a = f a, a
+    let inline liftSnd ([<InlineIfLambda>]f: 'a -> 'b) a = a, f a
     let apply = (<||)
     let uncurry f a b = f (a, b)
+
+module StructTuple2 =
+    let inline map ([<InlineIfLambda>]f: 'a -> 'b) ([<InlineIfLambda>]g: 'c -> 'd) struct(a,b) = f a, g b
+    let inline mapFst ([<InlineIfLambda>]f) struct(a, b) = struct(f a, b)
+    let inline mapSnd ([<InlineIfLambda>]f) struct(a, b) = struct(a, f b)
+    let inline liftFst ([<InlineIfLambda>]f: 'a -> 'b) a = struct(f a, a)
+    let inline liftSnd ([<InlineIfLambda>]f: 'a -> 'b) a = struct(a, f a)
+    let inline apply f struct(x,y) = f x y
+    let uncurry f a b = f struct(a, b)
 
 module Fn =
     let flip f a b = f b a
@@ -80,6 +92,10 @@ module Option =
         f a >>= g
     let inline (<=<) (f: 'b -> 'c option) (g: 'a -> 'b option) =
         g >=> f
+
+let inline stackalloc(span: Span<'t> byref, count) =
+    let ptr = NativePtr.stackalloc<'t> count
+    span <- Span(NativePtr.toVoidPtr ptr, count)
 
 type ReadOnlySpan<'T> with
     member sp.GetSlice(startIdx, endIdx) =
@@ -96,7 +112,9 @@ let vectorise (span: Span<'t>) (tail: Span<'t> outref) =
 
 let vectorise128 (span: Span<'t>) (tail: Span<'t> outref) =
     let vectors = MemoryMarshal.Cast<'t, Vector128<'t>>(span)
-    tail <- span.Slice(vectors.Length * sizeof<'t> * Vector128<'t>.Count)
+    let vSz = vectors.Length * sizeof<'t> * Vector128<'t>.Count
+    if vSz < span.Length then
+        tail <- span.Slice(vectors.Length * sizeof<'t> * Vector128<'t>.Count)
     vectors
 
 module Array =
