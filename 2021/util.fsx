@@ -117,12 +117,22 @@ let vectorise128 (span: Span<'t>) (tail: Span<'t> outref) =
         tail <- span.Slice(vectors.Length * sizeof<'t> * Vector128<'t>.Count)
     vectors
 
+let inline incr (i: int byref) 
+    = i <- i + 1
+
 module Array =
     let inline reduceInline ([<InlineIfLambda>]f: 'a -> 'a -> 'a) (arr: 'a[]) =
         let mutable res = arr.[0]
         for i = 1 to arr.Length-1 do
             res <- f res arr.[i]
         res
+
+    let inline findIndexInline ([<InlineIfLambda>]f: 'a -> bool) (arr: 'a[]) =
+        let mutable i = 0
+        while i < arr.Length && not(f arr[i]) do
+            incr &i
+        if i = arr.Length then -1 else i
+            
 
     let inline permuteInline ([<InlineIfLambda>]indexMap) (arr : _[]) =
         let res = Array.zeroCreate arr.Length

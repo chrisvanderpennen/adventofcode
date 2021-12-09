@@ -9,11 +9,6 @@ open System.Runtime.Intrinsics.X86
 open System.Runtime.InteropServices
 open BenchmarkDotNet.Attributes
 
-let inline hsum_epi32_avx (v: Vector128<int>) =
-    let sum64 = Avx2.Add(Avx2.UnpackHigh(v.AsInt64(), v.AsInt64()).AsInt32(), v)
-    let sum32 = Avx2.Add(sum64, Avx2.Shuffle(sum64, 0b10110001uy));
-    sum32.ToScalar<int> ()
-
 type Answer () =
     inherit BaseAnswer()
     let mask = 0b0000_1111uy
@@ -41,10 +36,6 @@ type Answer () =
             let sabs = Avx2.SumAbsoluteDifferences(v, Vector256.Zero).As<uint16, uint64>()
             sabs.GetElement(0) + sabs.GetElement(1) + sabs.GetElement(2) + sabs.GetElement(3)
 
-        let inline vecsum128 (v: Vector128<byte>) =
-            let sabs = Avx2.SumAbsoluteDifferences(v, Vector128.Zero).As<uint16, uint64>()
-            sabs.GetElement(0) + sabs.GetElement(1)// + sabs.GetElement(2) + sabs.GetElement(3)
-
         let fish = (Array.zeroCreate<uint64> 9).AsSpan()
 
         fish[1] <- vecsum v1
@@ -71,6 +62,7 @@ type Answer () =
 
     [<Benchmark>]
     member public this.partTwo () = this.computeFish 256
+
 
 let answer = Answer ()
 answer.setup ()
