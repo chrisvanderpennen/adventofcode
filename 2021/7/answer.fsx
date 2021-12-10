@@ -224,14 +224,7 @@ type Answer () =
             let dst = abs(b - a)
             dst * (dst + 1) / 2
 
-<<<<<<< Updated upstream
         let rec gradientDescent dMin pMin dMax pMax =
-=======
-        let mutable tests = 0
-
-        let rec frechetMedian dMin pMin dMax pMax =
-            tests <- tests + 1
->>>>>>> Stashed changes
             match abs(pMax - pMin) with
             | 0
             | 1 -> 
@@ -244,12 +237,7 @@ type Answer () =
                 let d1 = Array.sumBy (distance p1) arr
                 if dMin < dMax then gradientDescent dMin pMin d1 p1 else gradientDescent dMax pMax d1 p1
 
-<<<<<<< Updated upstream
         let struct(distance, fm) = gradientDescent (Array.sumBy (distance minV) arr) minV (Array.sumBy (distance maxV) arr) maxV
-=======
-        let struct(distance, fm) = frechetMedian (Array.sumBy (riemannDistance minV) arr) minV (Array.sumBy (riemannDistance maxV) arr) maxV
-        printfn "%A" tests
->>>>>>> Stashed changes
         fm, distance, (double (Array.sum arr) / double arr.Length)
 
     [<Benchmark>]
