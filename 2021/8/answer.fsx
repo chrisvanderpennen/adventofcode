@@ -169,6 +169,75 @@ let part2Binary (input: Span<byte>) =
         res <- res + (outputs |> Array.mapi (fun i e -> (Array.IndexOf(digits, e)) * (pown 10 (3 - i))) |> Array.sum)
 
     res
+
+
+let part2Binary2 (input: Span<byte>) =
+    
+    let bitmap = [|A;B;C;D;E;F;G|]
+    let mutable i = 0
+    let mutable res = 0
+    
+    while i < input.Length do
+
+        let digits = Array.zeroCreate<byte> 10
+        let fives = Array.zeroCreate<byte> 3
+        let sixes = Array.zeroCreate<byte> 3
+        // digits
+        let mutable len = 0
+        let mutable num = 0uy
+        let mutable nFives = 0
+        let mutable nSixes = 0
+        while input[i] <> Pipe do
+            match input[i] with
+            | Space ->
+                match len with
+                | 2 -> digits[1] <- num
+                | 3 -> digits[7] <- num
+                | 4 -> digits[4] <- num
+                | 7 -> digits[8] <- num
+                | 5 ->
+                    fives[nFives] <- num
+                    incr &nFives
+                | 6 -> 
+                    sixes[nSixes] <- num
+                    incr &nSixes
+                len <- 0
+                num <- 0uy
+            | _ -> 
+                incr &len
+                num <- num ||| (bitmap[int( input[i] - Achar )])
+            incr &i
+        
+        // move past the pipe
+        incr &i
+
+        let outputs = Array.zeroCreate 4
+        let mutable count = 0
+        // outputs
+        while i < input.Length && input[i] <> Newline do
+            let mutable num = 0uy
+            if input[i] = Space then incr &i
+            while i < input.Length && input[i] <> Space && input[i] <> Newline do
+                num <- num ||| (bitmap[int( input[i] - Achar )])
+                incr &i
+            outputs[count] <- num
+            incr &count
+        
+        // move past the newline
+        incr &i
+
+        digits[9] <- sixes[sixes |> Array.findIndexInline (fun digit -> digits[4] &&& digit = digits[4])]
+        digits[6] <- sixes[sixes |> Array.findIndexInline (fun digit -> digits[1] &&& digit <> digits[1])]
+        digits[0] <- sixes[sixes |> Array.findIndexInline (fun digit -> (digit ||| digits[1]) &&& digits[4] <> digits[4])]
+
+        digits[3] <- fives[fives |> Array.findIndexInline (fun digit -> digit &&& digits[1] = digits[1])]
+        digits[2] <- fives[fives |> Array.findIndexInline (fun digit -> (digit ||| digits[4]) = digits[8])]
+        digits[5] <- fives[fives |> Array.findIndexInline (fun digit -> (digit ||| digits[1]) &&& digits[4] = digits[4])]
+
+        res <- res + (outputs |> Array.mapi (fun i e -> (Array.IndexOf(digits, e)) * (pown 10 (3 - i))) |> Array.sum)
+
+    res
+
 type Answer () =
     inherit BaseAnswer()
 
@@ -213,12 +282,19 @@ type Answer () =
     member public this.partTwoBinary () =
         let input = this.loadBinary ()
         part2Binary input
+
+    [<Benchmark>]
+    member public this.partTwoBinary2 () =
+        let input = this.loadBinary ()
+        part2Binary2 input
+        
         
 let answer = Answer ()
 answer.setup ()
 printfn "%A" (answer.partOne ())
 printfn "%A" (answer.partTwo ())
 printfn "%A" (answer.partTwoBinary ())
+printfn "%A" (answer.partTwoBinary2 ())
 
 #if !INTERACTIVE
 open BenchmarkDotNet.Running
