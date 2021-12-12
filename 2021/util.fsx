@@ -11,6 +11,7 @@ open System.Runtime.Intrinsics
 open FSharp.NativeInterop
 open BenchmarkDotNet.Attributes
 open System.Buffers
+open System.Collections.Generic
 
 [<SimpleJob>]
 [<MemoryDiagnoser>]
