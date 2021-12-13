@@ -26,11 +26,11 @@ let inline parseLines (input: string list) =
         input
         |> List.collect (fun s -> let [|a; b|] = s.Split('-') in let a = identifyCave a in let b = identifyCave b in [a, b; b, a])
         |> List.groupBy fst
-        |> List.map (Tuple2.mapSnd (List.map snd))
+        |> List.map (Tuple2.mapSnd (List.map snd >> Set))
         |> Map.ofList
     outEdges
 
-let rec search results visited (edges: Map<Cave, Cave list>) path next =
+let rec search results visited (edges: Map<Cave, Set<Cave>>) path next =
     match next with
     | End -> [next::path]
     | _ ->
@@ -38,9 +38,8 @@ let rec search results visited (edges: Map<Cave, Cave list>) path next =
         | Some outEdges ->
             let visited = match next with | Large _ -> visited | _ -> Set.add next visited
             let outEdges =
-                outEdges
-                |> List.filter (visited.Contains >> not)
-            let r = outEdges |> List.collect (fun outEdge -> search results visited edges (next::path) outEdge)
+                Set.difference outEdges visited
+            let r = outEdges |> Seq.collect (fun outEdge -> search results visited edges (next::path) outEdge) |> List.ofSeq
             r @ results
         | None ->
             // dead end
@@ -56,7 +55,7 @@ let inline partOne(input: string list) =
     |> List.map (List.map (function | Start -> "start" | End -> "end" | Small c | Large c -> c) >> List.reduce (sprintf "%s,%s"))
     #endif
 
-let rec search2 results visited visitedSmall hasVisitedSecondSmall (edges: Map<Cave, Cave list>) path next =
+let rec search2 results visited visitedSmall hasVisitedSecondSmall (edges: Map<Cave, Set<Cave>>) path next =
     match next with
     | End -> [next::path]
     | _ ->
@@ -70,13 +69,11 @@ let rec search2 results visited visitedSmall hasVisitedSecondSmall (edges: Map<C
                     else visited, Set.add next visitedSmall, false
                 | _ -> visited, visitedSmall, hasVisitedSecondSmall
             let outEdges =
-                outEdges
-                |> List.filter (visited.Contains >> not)
-            let r = outEdges |> List.collect (fun outEdge -> search2 results visited visitedSmall hasVisitedSecondSmall edges (next::path) outEdge)
-            r @ results
+                Set.difference outEdges visited
+            outEdges |> Seq.collect (fun outEdge -> search2 results visited visitedSmall hasVisitedSecondSmall edges (next::path) outEdge) |> List.ofSeq
         | None ->
             // dead end
-            results
+            []
 
 let inline partTwo (input: string list) =
     let outEdgeList = parseLines input

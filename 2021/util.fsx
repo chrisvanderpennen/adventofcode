@@ -118,6 +118,18 @@ let vectorise128 (span: Span<'t>) (tail: Span<'t> outref) =
         tail <- span.Slice(vectors.Length * sizeof<'t> * Vector128<'t>.Count)
     vectors
 
+let vectoriseRight (span: Span<'t>) (tail: Span<'t> outref) =
+    let overflowLength = span.Length % (sizeof<'t> * Vector256<'t>.Count)
+    if overflowLength > 0 then
+        tail <- span.Slice(0, overflowLength)
+    MemoryMarshal.Cast<'t, Vector256<'t>>(span.Slice(overflowLength))
+
+let vectoriseRight128 (span: Span<'t>) (tail: Span<'t> outref) =
+    let overflowLength = span.Length % (sizeof<'t> * Vector128<'t>.Count)
+    if overflowLength > 0 then
+        tail <- span.Slice(0, overflowLength)
+    MemoryMarshal.Cast<'t, Vector128<'t>>(span.Slice(overflowLength))
+
 let inline incr (i: int byref) 
     = i <- i + 1
 

@@ -10,10 +10,10 @@ open Checked
 open System
 open BenchmarkDotNet.Attributes
 
-let inline partOne(input: Span<byte> inref) =
+let inline partOne(input: Span<byte>) =
     ()
 
-let inline partTwo(input: Span<byte> inref) =
+let inline partTwo(input: Span<byte>) =
     ()
 
 type Answer () =
@@ -21,13 +21,11 @@ type Answer () =
 
     [<Benchmark>]
     member public this.PartOne () =
-        let input = this.loadBinary ()
-        partOne(&input)
+        partOne(this.loadBinary ())
 
     [<Benchmark>]
     member public this.PartTwo () =
-        let input = this.loadBinary ()
-        partTwo(&input)
+        partTwo( this.loadBinary ())
 
 let answer = Answer ()
 answer.setup ()
