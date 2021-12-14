@@ -98,6 +98,9 @@ let inline stackalloc(span: Span<'t> byref, count) =
     let ptr = NativePtr.stackalloc<'t> count
     span <- Span(NativePtr.toVoidPtr ptr, count)
 
+let inline structFst struct(a,b) = a
+let inline structSnd struct(a,b) = b
+
 type ReadOnlySpan<'T> with
     member sp.GetSlice(startIdx, endIdx) =
         let s = defaultArg startIdx 0
@@ -134,6 +137,12 @@ let inline incr (i: int byref)
     = i <- i + 1
 
 module Array =
+    let inline initInline(length, [<InlineIfLambda>]f: int -> 'a) =
+        let array = Array.zeroCreate length
+        for i = 0 to length - 1 do
+            array[i] <- f i
+        array
+
     let inline reduceInline ([<InlineIfLambda>]f: 'a -> 'a -> 'a) (arr: 'a[]) =
         let mutable res = arr.[0]
         for i = 1 to arr.Length-1 do
