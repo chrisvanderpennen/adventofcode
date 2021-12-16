@@ -13,9 +13,9 @@ open BenchmarkDotNet.Attributes
 open System.Buffers
 open System.Collections.Generic
 
-[<SimpleJob>]
+[<RyuJitX64Job>]
 [<MemoryDiagnoser>]
-// [<DisassemblyDiagnoser(printSource = true)>]
+[<DisassemblyDiagnoser(printSource = true, maxDepth=3, exportHtml=true)>]
 type BaseAnswer () =
 
 #if INTERACTIVE

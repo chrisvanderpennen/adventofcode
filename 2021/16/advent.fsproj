@@ -2,10 +2,12 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <TargetFramework>net6.0</TargetFramework>
     <RootNamespace>advent</RootNamespace>
-    <DebugType>embedded</DebugType>
+    <DebugType>pdbonly</DebugType>
     <DebugSymbols>true</DebugSymbols>
+    <Deterministic>false</Deterministic>
   </PropertyGroup>
 
   <ItemGroup>

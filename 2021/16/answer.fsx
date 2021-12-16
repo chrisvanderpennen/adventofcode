@@ -9,6 +9,8 @@ open Checked
 
 open System
 open BenchmarkDotNet.Attributes
+open System.Runtime.CompilerServices
+
 let inline readBitAt (data: byte[]) offset =
     (match offset % 8 with
     | 0 -> data[offset / 8] >>> 7
@@ -23,6 +25,7 @@ let inline readBitsAt (data: byte[]) offset length =
     | shift -> 
         ((data[offset / 8] <<< (shift)) + (data[offset / 8 + 1] >>> (8 - shift))) >>> (8 - length)
 
+[<MethodImpl(MethodImplOptions.AggressiveInlining)>]
 let rec consumeLiteral data offset =
     let hunk = readBitsAt data offset 5
     // printf "<   >"
@@ -31,13 +34,14 @@ let rec consumeLiteral data offset =
     else
         offset + 5
 
-let rec readLiteral data offset =
+[<MethodImpl(MethodImplOptions.AggressiveInlining)>]
+let rec readLiteral value data offset =
     let hunk = readBitsAt data offset 5
+    let value = (value <<< 4) + uint64 (hunk &&& 0b0000_1111uy)
     if hunk > 0b0000_1111uy then
-        let struct(tail, endOffset, hunks) = readLiteral data (offset + 5)
-        struct(((uint64 (hunk &&& 0b0000_1111uy)) <<< (hunks * 4)) ||| tail, endOffset, hunks + 1)
+        readLiteral value data (offset + 5)
     else
-        struct(uint64 (hunk &&& 0b0000_1111uy), offset + 5, 1)
+        struct(value, offset + 5)
 
 let rec scanPacketVersionNumbers data offset =
     let localVersion = int <| readBitsAt data offset 3
@@ -159,7 +163,7 @@ and evaluateBITSpacket data offset =
     let offset = offset + 6
     match packetType with
     | 4uy -> // literal
-        let struct(literal, endoffset, _) = readLiteral data offset
+        let struct(literal, endoffset) = readLiteral 0uL data offset
         // printf "%i" literal
         struct(literal, endoffset)
     | 0uy -> // sum
@@ -192,7 +196,6 @@ let inline partOne(input: ReadOnlySpan<char>) =
     // printfn ""
     res
 
-
 let inline partTwo(input: ReadOnlySpan<char>) =
     let data = Convert.FromHexString(input)
     // Array.iter (printf "%08B") data
@@ -200,46 +203,8 @@ let inline partTwo(input: ReadOnlySpan<char>) =
     let res = evaluateBITSpacket data 0
     // printfn ""
     res
-
-// let inline parse (input: ReadOnlySpan<char>) =
-//     let data = Convert.FromHexString(input)
-//     data
-
-// let chartostring = 
-//     function
-//     | '0' -> "0000"
-//     | '1' -> "0001"
-//     | '2' -> "0010"
-//     | '3' -> "0011"
-//     | '4' -> "0100"
-//     | '5' -> "0101"
-//     | '6' -> "0110"
-//     | '7' -> "0111"
-//     | '8' -> "1000"
-//     | '9' -> "1001"
-//     | 'A' -> "1010"
-//     | 'B' -> "1011"
-//     | 'C' -> "1100"
-//     | 'D' -> "1101"
-//     | 'E' -> "1110"
-//     | 'F' -> "1111"
-
-// let inline parseWiden (input: ReadOnlySpan<char>) =
-//     let sb = StringBuilder(input.Length * 4)
-//     for c in input do
-//         sb.Append (chartostring c)
-//     sb.ToString()
-
 type Answer () =
     inherit BaseAnswer()
-
-    // [<Benchmark>]
-    // member public this.parse () =
-    //     parse(this.loadChars ())
-
-    // [<Benchmark>]
-    // member public this.parseWiden () =
-    //     parseWiden(this.loadChars ())
 
     [<Benchmark>]
     member public this.PartOne () =
@@ -251,8 +216,8 @@ type Answer () =
 
 let answer = Answer ()
 answer.setup ()
-// printfn "%A" (answer.PartOne ())
-// printfn "%A" (answer.PartTwo ())
+printfn "%A" (answer.PartOne ())
+printfn "%A" (answer.PartTwo ())
 
 #if !INTERACTIVE
 open BenchmarkDotNet.Running
