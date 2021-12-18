@@ -36,3 +36,8 @@ printfn "%A" (answer.PartTwo ())
 open BenchmarkDotNet.Running
 BenchmarkRunner.Run<Answer>() |> ignore
 #endif
+
+// this makes static initialisers run
+[<EntryPoint>]
+let main _ =
+    0
