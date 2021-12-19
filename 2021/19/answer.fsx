@@ -111,9 +111,7 @@ let hasDistanceOverlap (a: HashSet<int>[]) (b: HashSet<int>[]) =
     Seq.allPairs a b
     |> Seq.exists (fun (a,b) -> countOverlaps a b >= 12)
 
-let inline partOne(input: string list) =
-    let origin,tail = parseScanner input
-    let scannerData = parseScanners tail
+let rec positionScannerData (origin: Scanner) scannerData =
 
     let overlap = 
         scannerData
@@ -126,6 +124,26 @@ let inline partOne(input: string list) =
         |> Seq.countBy id
         |> Seq.tryFind (snd >> (>=) 12)
         |> Option.map (fun (a,_) -> set, a)
+    )
+
+let inline partOne(input: string list) =
+    let origin,tail = parseScanner input
+    let scannerData = parseScanners tail
+
+    let overlaps = 
+        scannerData
+        |> List.filter (fun data -> hasDistanceOverlap origin.DistanceSets data.DistanceSets)
+    
+    overlaps
+    |> List.map (fun overlap ->
+        overlap.RotatedCoordinateSets
+        |> Seq.pick (fun set ->
+            Seq.allPairs (origin.Coordinates) set
+            |> Seq.map ((<||) (-) >> roundVector)
+            |> Seq.countBy id
+            |> Seq.tryFind (snd >> (>=) 12)
+            |> Option.map (fun (a,_) -> set, a)
+        )
     )
 
 let inline partTwo(input: Span<byte>) =

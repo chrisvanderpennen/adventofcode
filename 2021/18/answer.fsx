@@ -31,8 +31,7 @@ module Parser =
     let nodeContent = element .>> pchar ',' .>>. element |>> Node
     nodeRef.Value <- between (pchar '[') (pchar ']') nodeContent
 
-    let parse str = 
-        match run node str with
+    let parse = run node >> function
         | Success (number, _, _) -> number
         | Failure (err, _, _) -> failwith err
 
@@ -81,8 +80,8 @@ let bubbleExplosionRight left =
     | LiftExplosionRight (replacement, rightPart) -> 
         LiftExplosionRight (Node(left, replacement), rightPart)
 
-let rec walkExplosions depth number =
-    match number with
+let rec walkExplosions depth =
+    function
     | Value _ -> None
     | Node (Value left, Value right) when depth > 3 -> Some (Explode (left, right))
     | Node (left, right) ->
@@ -93,8 +92,8 @@ let rec walkExplosions depth number =
             |> Option.map (bubbleExplosionRight left)
         )
 
-let rec walkSplits number =
-    match number with
+let rec walkSplits =
+    function
     | Value v when v > 9 -> Some (split v)
     | Value _ -> None
     | Node (left, right) ->
@@ -148,9 +147,9 @@ let partOne(input: string list) =
     |> magnitude
 
 let partTwo(input: string list) =
-    let parsed = List.map (Parser.parse) input
-
-    allPairs parsed
+    input
+    |> List.map (Parser.parse)
+    |> allPairs
     |> List.collect (fun (l,r) -> [magnitude (l + r); magnitude (r + l)])
     |> List.max
 
