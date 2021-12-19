@@ -122,20 +122,27 @@ let rec alignScanners (origins: Scanner list) (scannerData: ScannerData list) =
             (([],[]), scannerData)
             ||> List.fold (
                 fun (hits, misses) data ->
-                    origins 
+                    origins
                     |> List.tryFind (fun origin -> hasDistanceOverlap origin.DistanceSets data.DistanceSets)
                     |> Option.bind (fun origin -> 
                         data.RotatedCoordinateSets
                         |> Seq.tryPick (fun set ->
+                            // TODO
+                            // for each origin coordinate
+                            // select a target coordinate
+                            // offset all target coordinates by (origin - target)
+                            // if there are 12 or more offset coordinates in the origin coordinate set
+                            // we have found our offset
                             Seq.allPairs (origin.Coordinates) set
-                            |> Seq.map (fun (a, b) -> roundVector (b - a))
-                            |> Seq.countBy id
-                            |> Seq.tryFind (fun (_, b) -> b >= 12)
-                            |> Option.map (fun (a,_) -> origin, data, set, a)
+                            |> Seq.groupBy (fun (a, b) -> manhattanDistance a b)
+                            |> Seq.tryFind (fun (_, set) -> Seq.length set >= 12)
+                            |> Option.map (fun (_,matches) -> 
+                                let (a,b) = Seq.head matches
+                                (origin, data, set, b - a))
                         )
                         |> Option.map (fun (origin, overlap, coords, offset) ->
                             {
-                                Coordinates = coords |> Seq.map (fun c -> roundVector(c - offset)) |> Array.ofSeq
+                                Coordinates = coords |> Seq.map (fun c -> c - offset) |> Array.ofSeq
                                 DistanceSets = overlap.DistanceSets
                             }::hits, misses
                         )
