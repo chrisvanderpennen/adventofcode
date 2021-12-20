@@ -12,7 +12,7 @@
 
   <ItemGroup>
     <Compile Include="../util.fsx" />
-    <Compile Include="answer.fsx" />
+    <Compile Include="answer.fs" />
     <Content Include="input.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

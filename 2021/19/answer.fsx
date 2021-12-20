@@ -18,34 +18,39 @@ let angles = [
     0.0f
     pi * 0.5f
     pi
-    pi * 1.5f
-]
-let axes = [
-    Vector3.UnitX
-    Vector3.UnitY
-    Vector3.UnitZ
-    -Vector3.UnitX
-    -Vector3.UnitY
-    -Vector3.UnitZ
+    pi * -0.5f
 ]
 
-let allRotations =
-    List.allPairs axes angles
-    |> List.map Quaternion.CreateFromAxisAngle
+let facings = [
+    Quaternion.CreateFromYawPitchRoll(0f, 0f, 0f)
+    Quaternion.CreateFromYawPitchRoll(pi * 0.5f, 0f, 0f)
+    Quaternion.CreateFromYawPitchRoll(pi, 0f, 0f)
+    Quaternion.CreateFromYawPitchRoll(pi * -0.5f, 0f, 0f)
+    Quaternion.CreateFromYawPitchRoll(0f, pi * 0.5f, 0f)
+    Quaternion.CreateFromYawPitchRoll(0f, pi * -0.5f, 0f)
+]
+
+let attitudes = angles |> List.map (fun angle -> Quaternion.CreateFromYawPitchRoll(0f, 0f, angle))
+
+let allRotations = List.allPairs facings attitudes |> List.map (fun (facing, attitude) -> facing * attitude)
 
 let manhattanDistance (a: Vector3) (b: Vector3) =
     abs(b.X - a.X) + abs(b.Y - a.Y) + abs(b.Z - a.Z)
     |> int
 
+let flipNegativeZero = function | -0f -> 0f | f -> f
+
 let roundVector (v: Vector3) =
-    Vector3(MathF.Round(v.X), MathF.Round(v.Y), MathF.Round(v.Z))
+    // for some reason y ends up -0 in a few cases.  floats, right
+    Vector3(MathF.Round(v.X), flipNegativeZero <| MathF.Round(v.Y), MathF.Round(v.Z))
 
 let transformRound (quat: Quaternion) vec =
     roundVector <| Vector3.Transform(vec, quat)
 
 type Scanner = {
-    Coordinates: Vector3[]
+    Coordinates: HashSet<Vector3>
     DistanceSets: HashSet<int>[]
+    Origin: Vector3
 }
 
 type ScannerData = {
@@ -55,6 +60,11 @@ type ScannerData = {
 
 let countOverlaps (a: HashSet<_>) b =
     b |> Seq.filter (a.Contains) |> Seq.length
+
+let calculateDistanceSets vectors =
+    vectors
+    |> Seq.map (fun v -> Seq.map (fun vv -> manhattanDistance v vv) (Seq.filter (fun vv -> vv <> v) vectors) |> HashSet)
+    |> Array.ofSeq
 
 let parseScanner (lines: string list) =
     let id::vectors = lines
@@ -66,11 +76,11 @@ let parseScanner (lines: string list) =
             let [|x;y;z|] = vectorData.Split(',') |> Array.map float32
             readVectors (Vector3(x, y, z)::acc) tail
     let initialVectors, next = readVectors [] vectors
-    let distanceSets =
-        initialVectors
-        |> List.map (fun v -> Seq.map (fun vv -> manhattanDistance v vv) (Seq.filter ((<>)v) initialVectors) |> HashSet)
-        |> Array.ofList
-    {Coordinates=Array.ofList initialVectors; DistanceSets=distanceSets}, next
+    {
+        Coordinates=HashSet initialVectors
+        DistanceSets=calculateDistanceSets initialVectors
+        Origin=Vector3.Zero
+    }, next
 
 let parseScannerData (lines: string list) =
     let id::vectors = lines
@@ -85,17 +95,12 @@ let parseScannerData (lines: string list) =
 
     let allRotatedVectors =
         allRotations
-        |> List.map (fun quat -> (Seq.map (transformRound quat) initialVectors) |> HashSet)
-        |> Array.ofList
-
-    let distanceSets =
-        initialVectors
-        |> List.map (fun v -> Seq.map (fun vv -> manhattanDistance v vv) (Seq.filter ((<>)v) initialVectors) |> HashSet)
-        |> Array.ofList
+        |> Seq.map (fun quat -> (Seq.map (transformRound quat) initialVectors) |> HashSet)
+        |> Array.ofSeq
 
     {
         RotatedCoordinateSets = allRotatedVectors;
-        DistanceSets = distanceSets
+        DistanceSets = calculateDistanceSets initialVectors
     }, next
 
 let parseScanners input =
@@ -113,102 +118,68 @@ let hasDistanceOverlap (a: HashSet<int>[]) (b: HashSet<int>[]) =
 
 let rec alignScanners (origins: Scanner list) (scannerData: ScannerData list) =
 
+    #if DEBUG
     printfn "%A %A" (List.length origins) (List.length scannerData)
+    #endif
 
     match scannerData with
     | [] -> origins
     | _ ->
-        let overlaps, tail =
-            (([],[]), scannerData)
+        let alignedScanners, tail =
+            ((origins,[]), scannerData)
             ||> List.fold (
                 fun (hits, misses) data ->
-                    origins
+                    hits
                     |> List.tryFind (fun origin -> hasDistanceOverlap origin.DistanceSets data.DistanceSets)
                     |> Option.bind (fun origin -> 
                         data.RotatedCoordinateSets
-                        |> Seq.tryPick (fun set ->
-                            // TODO
-                            // for each origin coordinate
-                            // select a target coordinate
-                            // offset all target coordinates by (origin - target)
-                            // if there are 12 or more offset coordinates in the origin coordinate set
-                            // we have found our offset
+                        |> Array.tryPick (fun set ->
                             Seq.allPairs (origin.Coordinates) set
-                            |> Seq.groupBy (fun (a, b) -> manhattanDistance a b)
-                            |> Seq.tryFind (fun (_, set) -> Seq.length set >= 12)
-                            |> Option.map (fun (_,matches) -> 
-                                let (a,b) = Seq.head matches
-                                (origin, data, set, b - a))
+                            |> Seq.map (Tuple2.apply (-))
+                            |> Seq.tryPick (fun offset -> 
+                                let translatedSet = set |> Seq.map (fun c -> c + offset) |> HashSet
+                                if translatedSet |> Seq.filter (origin.Coordinates.Contains) |> Seq.length >= 12 then
+                                    Some (translatedSet, offset)
+                                else
+                                    None
+                                )
+                            |> Option.map (fun (translatedSet, offset) -> (data, translatedSet, offset))
                         )
-                        |> Option.map (fun (origin, overlap, coords, offset) ->
+                        |> Option.map (fun (overlap, coords, offset) ->
                             {
-                                Coordinates = coords |> Seq.map (fun c -> c - offset) |> Array.ofSeq
+                                Coordinates = coords
                                 DistanceSets = overlap.DistanceSets
+                                Origin = -offset
                             }::hits, misses
                         )
                     )
                     |> Option.defaultValue (hits, (data::misses))
             )
 
-        // let alignedOverlaps =
-        //     overlaps
-        //     |> List.choose (fun (origin, overlap) ->
-        //         overlap.RotatedCoordinateSets
-        //         |> Seq.tryPick (fun set ->
-        //             Seq.allPairs (origin.Coordinates) set
-        //             |> Seq.map (fun (a, b) -> roundVector (b - a))
-        //             |> Seq.countBy id
-        //             |> Seq.tryFind (fun (_, b) -> b >= 12)
-        //             |> Option.map (fun (a,_) -> origin, overlap, set, a)
-        //         )
-        //     )
-        // if alignedOverlaps = [] then failwith "error 2"
-        // let alignedOverlaps =
-        //     alignedOverlaps
-        //     |> List.map (
-        //         fun (origin, overlap, coords, offset) -> 
-        //             // printfn "--- MATCH ---"
-        //             // printfn "%A" (origin.Coordinates |> Array.sortBy (fun v -> v.X, v.Y, v.Z))
-        //             // printfn "%A" offset
-        //             // printfn "%A" (coords |> Seq.map (fun c -> roundVector(c - offset)) |> Array.ofSeq |> Array.sortBy (fun v -> v.X, v.Y, v.Z))
-        //             // printfn "--- ----- ---"
-        //             {
-        //                 Coordinates = coords |> Seq.map (fun c -> roundVector(c - offset)) |> Array.ofSeq
-        //                 DistanceSets = overlap.DistanceSets
-        //             }
-        //         )
+        alignScanners alignedScanners tail
 
-        alignScanners (overlaps @ origins) tail
-
-let inline partOne(input: string list) =
+let inline solve(input: string list) =
     let firstOrigin,tail = parseScanner input
     let scannerData = parseScanners tail
     let origins = [firstOrigin]
 
     let alignedScanners = alignScanners origins scannerData
-    let allPoints = 
-        (HashSet(), alignedScanners)
-        ||> Seq.fold (fun set scanner -> set.UnionWith (scanner.Coordinates); set)
-    allPoints.Count
-
-let inline partTwo(input: Span<byte>) =
-    ()
+    let allPoints = HashSet()
+    alignedScanners |> List.iter (fun s -> allPoints.UnionWith s.Coordinates)
+    let offsets = alignedScanners |> List.map (fun s -> s.Origin)
+    let maxDistance = List.allPairs offsets offsets |> List.map (fun (a,b) -> manhattanDistance a b) |> List.max
+    allPoints.Count, maxDistance
 
 type Answer () =
     inherit BaseAnswer()
 
     [<Benchmark>]
-    member public this.PartOne () =
-        partOne(this.loadLinesList ())
-
-    //[<Benchmark>]
-    member public this.PartTwo () =
-        partTwo( this.loadBinary ())
+    member public this.Solve () =
+        solve(this.loadLinesList ())
 
 let answer = Answer ()
 answer.setup ()
-printfn "%A" (answer.PartOne ())
-printfn "%A" (answer.PartTwo ())
+printfn "%A" (answer.Solve ())
 
 #if !INTERACTIVE
 open BenchmarkDotNet.Running

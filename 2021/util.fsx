@@ -15,7 +15,7 @@ open System.Collections.Generic
 
 [<RyuJitX64Job>]
 [<MemoryDiagnoser>]
-[<DisassemblyDiagnoser(printSource = true, maxDepth=3, exportHtml=true)>]
+//[<DisassemblyDiagnoser(printSource = true, maxDepth=3, exportHtml=true)>]
 type BaseAnswer () =
 
 #if INTERACTIVE
@@ -72,7 +72,7 @@ module Tuple2 =
     let inline mapSnd ([<InlineIfLambda>]f) (a, b) = a, f b
     let inline liftFst ([<InlineIfLambda>]f: 'a -> 'b) a = f a, a
     let inline liftSnd ([<InlineIfLambda>]f: 'a -> 'b) a = a, f a
-    let apply = (<||)
+    let apply f (a, b) = f a b
     let uncurry f a b = f (a, b)
 
 module StructTuple2 =
